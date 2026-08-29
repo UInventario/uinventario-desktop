@@ -1,0 +1,29 @@
+{
+  "name": "uinventario-desktop",
+  "productName": "UInventario",
+  "version": "0.1.0",
+  "description": "Cliente Desktop seguro de UInventario sobre la Web compartida",
+  "private": true,
+  "type": "module",
+  "main": "src/main.mjs",
+  "packageManager": "npm@12.0.2",
+  "scripts": {
+    "start": "electron . --environment=dev",
+    "start:prod": "electron . --environment=prod",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "node --test",
+    "install:electron": "install-electron --no",
+    "package:windows": "npm run install:electron && node scripts/package-windows.mjs",
+    "smoke": "node scripts/smoke-windows.mjs",
+    "smoke:prod": "node scripts/smoke-windows.mjs --environment=prod",
+    "verify": "npm run format:check && npm run lint && npm test && npm run package:windows"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "electron": "44.0.0",
+    "eslint": "10.9.1",
+    "globals": "17.11.0",
+    "prettier": "3.9.6"
+  }
+}
