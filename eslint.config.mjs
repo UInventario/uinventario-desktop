@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['node_modules/**', 'out/**'] },
+  { ignores: ['node_modules/**', 'out/**', 'dist/**'] },
   js.configs.recommended,
   {
     files: ['**/*.mjs'],
@@ -13,7 +13,7 @@ export default [
     },
   },
   {
-    files: ['src/preload.cjs'],
+    files: ['src/preload.cjs', 'electron-builder.config.cjs'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'commonjs',

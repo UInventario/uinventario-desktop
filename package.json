@@ -3,6 +3,7 @@
   "productName": "UInventario",
   "version": "0.1.0",
   "description": "Cliente Desktop seguro de UInventario sobre la Web compartida",
+  "author": "UInventario",
   "private": true,
   "type": "module",
   "main": "src/main.mjs",
@@ -14,7 +15,13 @@
     "lint": "eslint .",
     "test": "node --test",
     "install:electron": "install-electron --no",
-    "package:windows": "npm run install:electron && node scripts/package-windows.mjs",
+    "package:windows": "npm run install:electron && node scripts/build-distribution.mjs --target=dir --trust=test --channel=dev",
+    "dist:dev:test": "node scripts/build-distribution.mjs --target=nsis --trust=test --channel=dev",
+    "dist:prod:test": "node scripts/build-distribution.mjs --target=nsis --trust=test --channel=latest",
+    "dist:prod:signed": "node scripts/build-distribution.mjs --target=nsis --trust=signed --channel=latest",
+    "verify:dist:dev:test": "node scripts/verify-update-artifact.mjs --trust=test --channel=dev",
+    "verify:dist:prod:test": "node scripts/verify-update-artifact.mjs --trust=test --channel=latest",
+    "verify:dist:prod:signed": "node scripts/verify-update-artifact.mjs --trust=signed --channel=latest",
     "smoke": "node scripts/smoke-windows.mjs",
     "smoke:access": "node scripts/smoke-windows.mjs --access-cleanup",
     "smoke:offline": "node scripts/smoke-windows.mjs --offline",
@@ -24,8 +31,13 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "electron": "44.0.0",
+    "electron-builder": "26.15.3",
     "eslint": "10.9.1",
     "globals": "17.11.0",
     "prettier": "3.9.6"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9",
+    "semver": "7.7.3"
   }
 }
