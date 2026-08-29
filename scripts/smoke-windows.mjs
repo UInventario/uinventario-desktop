@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const executable = join(root, 'out', 'UInventario-win32-x64', 'UInventario.exe');
 const environmentArgument = process.argv.find((value) => value.startsWith('--environment=')) ?? '--environment=dev';
+const offline = process.argv.includes('--offline');
+const accessCleanup = process.argv.includes('--access-cleanup');
 
 if (!['--environment=dev', '--environment=prod'].includes(environmentArgument)) {
   throw new Error('Desktop smoke requiere --environment=dev o --environment=prod.');
@@ -13,7 +15,8 @@ if (!['--environment=dev', '--environment=prod'].includes(environmentArgument)) 
 
 await stat(executable);
 
-const child = spawn(executable, ['--smoke-test', environmentArgument], {
+const smokeArgument = offline ? '--offline-smoke' : accessCleanup ? '--access-cleanup-smoke' : '--smoke-test';
+const child = spawn(executable, [smokeArgument, environmentArgument], {
   cwd: dirname(executable),
   stdio: 'inherit',
   windowsHide: true,

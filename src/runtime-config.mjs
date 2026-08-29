@@ -14,6 +14,13 @@ export function resolveEnvironment({ argv, env, isPackaged }) {
   return selected;
 }
 
+export function desktopPartition(environment) {
+  if (!SUPPORTED_ENVIRONMENTS.has(environment)) {
+    throw new Error('No se puede crear una partición para un ambiente desconocido.');
+  }
+  return `persist:uinventario-${environment}-v1`;
+}
+
 export function validateWebUrl(value) {
   let parsed;
   try {

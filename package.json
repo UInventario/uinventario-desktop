@@ -16,6 +16,8 @@
     "install:electron": "install-electron --no",
     "package:windows": "npm run install:electron && node scripts/package-windows.mjs",
     "smoke": "node scripts/smoke-windows.mjs",
+    "smoke:access": "node scripts/smoke-windows.mjs --access-cleanup",
+    "smoke:offline": "node scripts/smoke-windows.mjs --offline",
     "smoke:prod": "node scripts/smoke-windows.mjs --environment=prod",
     "verify": "npm run format:check && npm run lint && npm test && npm run package:windows"
   },

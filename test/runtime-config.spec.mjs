@@ -3,11 +3,17 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { loadRuntimeConfig, resolveEnvironment, validateWebUrl } from '../src/runtime-config.mjs';
+import { desktopPartition, loadRuntimeConfig, resolveEnvironment, validateWebUrl } from '../src/runtime-config.mjs';
 
 test('uses dev locally and prod for a packaged application', () => {
   assert.equal(resolveEnvironment({ argv: [], env: {}, isPackaged: false }), 'dev');
   assert.equal(resolveEnvironment({ argv: [], env: {}, isPackaged: true }), 'prod');
+});
+
+test('isolates persistent Chromium storage by environment', () => {
+  assert.equal(desktopPartition('dev'), 'persist:uinventario-dev-v1');
+  assert.equal(desktopPartition('prod'), 'persist:uinventario-prod-v1');
+  assert.throws(() => desktopPartition('local'));
 });
 
 test('explicit argument has precedence and invalid environments fail closed', () => {
