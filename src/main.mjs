@@ -57,6 +57,22 @@ async function waitForRenderedShell(webContents) {
   return false;
 }
 
+async function verifyPeripheralBridge(webContents) {
+  return webContents.executeJavaScript(
+    `(async () => {
+      const bridge = window.uinventarioDesktop;
+      if (bridge?.version !== 1) return false;
+      const result = await bridge.getPeripheralConfig({
+        tenantId: 'smoke-tenant',
+        cashRegisterId: 'smoke-cash',
+        deviceId: 'smoke-device'
+      });
+      return result?.status === 'COMPLETED' && result?.config?.scannerAdapter === 'HID_KEYBOARD';
+    })()`,
+    true,
+  );
+}
+
 async function waitForServiceWorker(webContents) {
   const deadline = Date.now() + 15_000;
 
@@ -287,6 +303,11 @@ async function createMainWindow() {
     try {
       if (!(await waitForRenderedShell(mainWindow.webContents))) {
         failSmoke('Desktop smoke recibió la página, pero Angular no renderizó el shell.');
+        return;
+      }
+
+      if (!(await verifyPeripheralBridge(mainWindow.webContents))) {
+        failSmoke('Desktop smoke no pudo operar el puente nativo de perifÃ©ricos.');
         return;
       }
 
