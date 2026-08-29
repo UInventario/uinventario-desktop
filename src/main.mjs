@@ -3,6 +3,10 @@ import { join } from 'node:path';
 import { clearOriginAccess, SESSION_CLOSED_CHANNEL } from './access-cleanup.mjs';
 import { readOfflineUpdateState } from './offline-update-state.mjs';
 import { isAllowedNavigation } from './navigation-policy.mjs';
+import { createPeripheralAdapters } from './peripheral-adapters.mjs';
+import { registerPeripheralIpc } from './peripheral-ipc.mjs';
+import { PeripheralManager } from './peripheral-manager.mjs';
+import { PeripheralStore } from './peripheral-store.mjs';
 import { desktopPartition, loadRuntimeConfig, resolveEnvironment } from './runtime-config.mjs';
 import { DesktopUpdateCoordinator } from './update-coordinator.mjs';
 import { resolveUpdateOptions } from './update-policy.mjs';
@@ -14,6 +18,8 @@ let mainWindow;
 let smokeSettled = false;
 let allowedOrigin;
 let offlineSmokePhase = offlineSmokeTest ? 'PRIME' : 'DISABLED';
+let peripheralIpcRegistered = false;
+let peripheralAdapters;
 
 const UPDATE_MESSAGES = {
   CURRENT_VERSION: 'Ya tienes la versión disponible en este canal.',
@@ -49,6 +55,22 @@ async function waitForRenderedShell(webContents) {
   }
 
   return false;
+}
+
+async function verifyPeripheralBridge(webContents) {
+  return webContents.executeJavaScript(
+    `(async () => {
+      const bridge = window.uinventarioDesktop;
+      if (bridge?.version !== 1) return false;
+      const result = await bridge.getPeripheralConfig({
+        tenantId: 'smoke-tenant',
+        cashRegisterId: 'smoke-cash',
+        deviceId: 'smoke-device'
+      });
+      return result?.status === 'COMPLETED' && result?.config?.scannerAdapter === 'HID_KEYBOARD';
+    })()`,
+    true,
+  );
 }
 
 async function waitForServiceWorker(webContents) {
@@ -206,6 +228,7 @@ async function configureApplicationMenu(config) {
 
 ipcMain.on(SESSION_CLOSED_CHANNEL, (event) => {
   if (!allowedOrigin || !isAllowedNavigation(event.sender.getURL(), allowedOrigin)) return;
+  peripheralAdapters?.clearDisplay();
   void clearOriginAccess(event.sender.session, allowedOrigin).catch((error) => {
     console.error(error instanceof Error ? error.message : 'No fue posible limpiar el acceso Desktop.');
   });
@@ -240,6 +263,24 @@ async function createMainWindow() {
     },
   });
 
+  if (!peripheralIpcRegistered) {
+    const store = new PeripheralStore(join(app.getPath('userData'), `peripherals-${environment}.json`));
+    peripheralAdapters = createPeripheralAdapters({
+      appPath: app.getAppPath(),
+      getMainWindow: () => mainWindow,
+    });
+    const manager = new PeripheralManager({
+      store,
+      adapters: peripheralAdapters,
+    });
+    registerPeripheralIpc({
+      ipcMain,
+      manager,
+      isAllowedSender: (url) => Boolean(allowedOrigin && isAllowedNavigation(url, allowedOrigin)),
+    });
+    peripheralIpcRegistered = true;
+  }
+
   const guardNavigation = (event, target) => {
     if (!isAllowedNavigation(target, config.webUrl)) {
       event.preventDefault();
@@ -262,6 +303,11 @@ async function createMainWindow() {
     try {
       if (!(await waitForRenderedShell(mainWindow.webContents))) {
         failSmoke('Desktop smoke recibió la página, pero Angular no renderizó el shell.');
+        return;
+      }
+
+      if (!(await verifyPeripheralBridge(mainWindow.webContents))) {
+        failSmoke('Desktop smoke no pudo operar el puente nativo de perifÃ©ricos.');
         return;
       }
 
