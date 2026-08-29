@@ -16,8 +16,7 @@ function failSmoke(message) {
   if (smokeSettled) return;
   smokeSettled = true;
   console.error(message);
-  process.exitCode = 1;
-  app.quit();
+  app.exit(1);
 }
 
 async function waitForRenderedShell(webContents) {
@@ -48,6 +47,37 @@ async function waitForServiceWorker(webContents) {
   }
 
   return false;
+}
+
+async function waitForNetworkAvailability(webContents, origin, expectedAvailable) {
+  const deadline = Date.now() + 5_000;
+
+  while (Date.now() < deadline) {
+    const healthUrl = `${origin}/health?ngsw-bypass=true&desktop-smoke=${Date.now()}`;
+    const available = await webContents.executeJavaScript(
+      `fetch(${JSON.stringify(healthUrl)}, { cache: 'no-store' }).then((response) => response.ok).catch(() => false)`,
+      true,
+    );
+    if (available === expectedAvailable) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return false;
+}
+
+async function emulateRendererOffline(webContents, offline) {
+  if (!webContents.debugger.isAttached()) {
+    webContents.debugger.attach('1.3');
+    await webContents.debugger.sendCommand('Network.enable');
+  }
+
+  await webContents.debugger.sendCommand('Network.emulateNetworkConditions', {
+    offline,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+    connectionType: offline ? 'none' : 'wifi',
+  });
 }
 
 async function verifyAccessCleanup(webContents, origin) {
@@ -152,28 +182,26 @@ async function createMainWindow() {
           return;
         }
         offlineSmokePhase = 'OFFLINE';
-        mainWindow.webContents.session.enableNetworkEmulation({ offline: true });
+        await emulateRendererOffline(mainWindow.webContents, true);
         await mainWindow.webContents.session.closeAllConnections();
         await mainWindow.loadURL(`${config.webUrl}/app`);
         return;
       }
 
       if (offlineSmokePhase === 'OFFLINE') {
-        const offline = await mainWindow.webContents.executeJavaScript('navigator.onLine === false', true);
-        if (!offline) {
-          failSmoke('Desktop smoke no confirmó el estado offline del renderer.');
+        if (!(await waitForNetworkAvailability(mainWindow.webContents, config.webUrl, false))) {
+          failSmoke('Desktop smoke no confirmó el corte real de red del renderer.');
           return;
         }
         offlineSmokePhase = 'RECONNECT';
-        mainWindow.webContents.session.disableNetworkEmulation();
+        await emulateRendererOffline(mainWindow.webContents, false);
         await mainWindow.loadURL(config.webUrl);
         return;
       }
 
       if (offlineSmokePhase === 'RECONNECT') {
-        const online = await mainWindow.webContents.executeJavaScript('navigator.onLine === true', true);
-        if (!online) {
-          failSmoke('Desktop smoke no recuperó la conexión del renderer.');
+        if (!(await waitForNetworkAvailability(mainWindow.webContents, config.webUrl, true))) {
+          failSmoke('Desktop smoke no recuperó una petición real tras reconectar.');
           return;
         }
       }
@@ -186,6 +214,9 @@ async function createMainWindow() {
       if (smokeSettled) return;
       smokeSettled = true;
       clearTimeout(smokeTimeout);
+      if (mainWindow.webContents.debugger.isAttached()) {
+        mainWindow.webContents.debugger.detach();
+      }
       console.log(`Desktop smoke OK: ${environment} ${config.webUrl}`);
       app.quit();
     } catch (error) {
