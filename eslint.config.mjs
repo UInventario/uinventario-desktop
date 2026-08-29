@@ -13,11 +13,17 @@ export default [
     },
   },
   {
-    files: ['src/preload.cjs', 'electron-builder.config.cjs'],
+    files: ['src/*-preload.cjs', 'src/preload.cjs', 'electron-builder.config.cjs'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'commonjs',
       globals: { ...globals.node, ...globals.browser },
+    },
+  },
+  {
+    files: ['src/customer-display.js'],
+    languageOptions: {
+      globals: globals.browser,
     },
   },
 ];
