@@ -12,4 +12,12 @@ export default [
       globals: globals.node,
     },
   },
+  {
+    files: ['src/preload.cjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'commonjs',
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
 ];

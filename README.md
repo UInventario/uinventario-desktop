@@ -24,6 +24,8 @@ npm ci
 npm start
 npm run verify
 npm run smoke
+npm run smoke:access
+npm run smoke:offline
 npm run smoke:prod
 ```
 
@@ -32,6 +34,13 @@ empaquetado usa el layout manual soportado por Electron para evitar introducir u
 árbol adicional de herramientas vulnerable: runtime oficial más `resources/app`.
 `smoke` ejecuta ese paquete, abre una ventana oculta contra Dev y termina al cargar
 el shell real.
+
+Cada ambiente usa una partición Chromium persistente separada. Cookies HttpOnly,
+cache y IndexedDB permanecen aislados entre Dev y Prod; el Service Worker permite
+arrancar el shell sin red después de una preparación online. La instantánea de sesión
+Web no contiene credenciales y sólo se restaura mientras el bootstrap y los permisos
+siguen vigentes. Logout o revocación limpian IndexedDB y notifican al proceso nativo
+para eliminar también cookies y autenticación HTTP.
 
 ## Seguridad y superficie nativa
 

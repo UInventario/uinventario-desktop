@@ -29,5 +29,7 @@ jobs:
         run: npm audit --audit-level=high
       - name: Verify source and Windows package
         run: npm run verify
-      - name: Smoke real Desktop shell against Dev
-        run: npm run smoke
+      - name: Smoke Desktop shell online and offline against Dev
+        run: npm run smoke:offline
+      - name: Smoke native access cleanup
+        run: npm run smoke:access
