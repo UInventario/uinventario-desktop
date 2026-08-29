@@ -1,8 +1,11 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
 import { join } from 'node:path';
 import { clearOriginAccess, SESSION_CLOSED_CHANNEL } from './access-cleanup.mjs';
+import { readOfflineUpdateState } from './offline-update-state.mjs';
 import { isAllowedNavigation } from './navigation-policy.mjs';
 import { desktopPartition, loadRuntimeConfig, resolveEnvironment } from './runtime-config.mjs';
+import { DesktopUpdateCoordinator } from './update-coordinator.mjs';
+import { resolveUpdateOptions } from './update-policy.mjs';
 
 const offlineSmokeTest = process.argv.includes('--offline-smoke');
 const accessCleanupSmokeTest = process.argv.includes('--access-cleanup-smoke');
@@ -11,6 +14,20 @@ let mainWindow;
 let smokeSettled = false;
 let allowedOrigin;
 let offlineSmokePhase = offlineSmokeTest ? 'PRIME' : 'DISABLED';
+
+const UPDATE_MESSAGES = {
+  CURRENT_VERSION: 'Ya tienes la versión disponible en este canal.',
+  INVALID_CHECKSUM: 'El instalador descargado no coincide con su hash publicado y fue rechazado.',
+  INVALID_SIGNATURE: 'La firma del instalador no corresponde al editor esperado y fue rechazada.',
+  INVALID_VERSION: 'El canal publicó una versión inválida.',
+  LOCAL_SCHEMA_CHANGED: 'El esquema local cambió durante la descarga. Reinicia y vuelve a intentarlo.',
+  LOCAL_STATE_UNAVAILABLE: 'No fue posible verificar el estado local. La actualización no se instalará.',
+  PENDING_OUTBOX: 'Sincroniza las operaciones pendientes antes de actualizar.',
+  ROLLBACK_NOT_EXPLICIT: 'Un downgrade requiere el canal y la opción explícita de rollback.',
+  UNSUPPORTED_LOCAL_SCHEMA: 'Esta versión no puede validar el esquema local actual.',
+  UPDATE_FAILED: 'No fue posible comprobar o descargar la actualización.',
+  UPDATE_NOT_PREPARED: 'La actualización aún no está preparada.',
+};
 
 function failSmoke(message) {
   if (smokeSettled) return;
@@ -99,6 +116,92 @@ async function verifyAccessCleanup(webContents, origin) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return false;
+}
+
+async function configureApplicationMenu(config) {
+  if (smokeTest || !app.isPackaged) {
+    Menu.setApplicationMenu(null);
+    return;
+  }
+
+  const updaterModule = await import('electron-updater');
+  const updater = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater;
+  if (!updater) throw new Error('No fue posible iniciar el actualizador Desktop.');
+
+  const updateOptions = resolveUpdateOptions({
+    environment: config.environment,
+    configuredChannel: config.updateChannel,
+    argv: process.argv,
+  });
+  const coordinator = new DesktopUpdateCoordinator({
+    updater,
+    getLocalState: () => readOfflineUpdateState(mainWindow.webContents),
+    currentVersion: app.getVersion(),
+    ...updateOptions,
+  });
+  let checking = false;
+
+  const checkForUpdates = async () => {
+    if (checking) return;
+    checking = true;
+    try {
+      const result = await coordinator.prepare();
+      if (result.status === 'NO_UPDATE') {
+        await dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Actualizaciones',
+          message: 'UInventario está actualizado.',
+        });
+        return;
+      }
+      if (result.status !== 'READY') {
+        await dialog.showMessageBox(mainWindow, {
+          type: result.status === 'REJECTED' ? 'error' : 'warning',
+          title: 'Actualización detenida',
+          message: UPDATE_MESSAGES[result.reason] ?? UPDATE_MESSAGES.UPDATE_FAILED,
+        });
+        return;
+      }
+
+      const confirmation = await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Actualización verificada',
+        message: `UInventario ${result.version} está listo para instalar.`,
+        detail:
+          result.direction === 'ROLLBACK'
+            ? 'Se aplicará el rollback explícito al reiniciar.'
+            : 'El instalador pasó la verificación de integridad y firma configurada para este canal.',
+        buttons: ['Instalar y reiniciar', 'Después'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+      if (confirmation.response !== 0) return;
+
+      const installation = await coordinator.install();
+      if (installation.status !== 'INSTALLING') {
+        await dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Actualización detenida',
+          message: UPDATE_MESSAGES[installation.reason] ?? UPDATE_MESSAGES.UPDATE_FAILED,
+        });
+      }
+    } finally {
+      checking = false;
+    }
+  };
+
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: 'UInventario',
+        submenu: [
+          { label: `Buscar actualizaciones (${updateOptions.channel})`, click: checkForUpdates },
+          { type: 'separator' },
+          { role: 'quit', label: 'Salir' },
+        ],
+      },
+    ]),
+  );
 }
 
 ipcMain.on(SESSION_CLOSED_CHANNEL, (event) => {
@@ -249,6 +352,8 @@ async function createMainWindow() {
       failSmoke(error instanceof Error ? error.message : 'Desktop smoke falló.');
     }
   }
+
+  return config;
 }
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -266,8 +371,8 @@ if (!hasSingleInstanceLock) {
   app
     .whenReady()
     .then(async () => {
-      Menu.setApplicationMenu(null);
-      await createMainWindow();
+      const config = await createMainWindow();
+      await configureApplicationMenu(config);
 
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) void createMainWindow();

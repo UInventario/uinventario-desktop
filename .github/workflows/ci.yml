@@ -33,3 +33,26 @@ jobs:
         run: npm run smoke:offline
       - name: Smoke native access cleanup
         run: npm run smoke:access
+      - name: Build and verify versioned update artifact
+        shell: pwsh
+        env:
+          TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: |
+          if ($env:TARGET_BRANCH -eq 'master') {
+            npm run dist:prod:test
+            npm run verify:dist:prod:test
+          } else {
+            npm run dist:dev:test
+            npm run verify:dist:dev:test
+          }
+      - name: Upload unsigned test distribution
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: uinventario-desktop-${{ github.sha }}-TEST-UNSIGNED
+          path: |
+            dist/*-test/*.exe
+            dist/*-test/*.exe.blockmap
+            dist/*-test/dev.yml
+            dist/*-test/latest.yml
+          if-no-files-found: error
+          retention-days: 7

@@ -44,11 +44,15 @@ test('loads the selected environment from the packaged configuration', async () 
   await mkdir(join(root, 'config'));
   await writeFile(
     join(root, 'config', 'environments.json'),
-    JSON.stringify({ dev: { webUrl: 'https://dev.example.com' }, prod: { webUrl: 'https://prod.example.com' } }),
+    JSON.stringify({
+      dev: { webUrl: 'https://dev.example.com', updateChannel: 'dev' },
+      prod: { webUrl: 'https://prod.example.com', updateChannel: 'latest' },
+    }),
   );
 
   assert.deepEqual(await loadRuntimeConfig(root, 'dev'), {
     environment: 'dev',
     webUrl: 'https://dev.example.com',
+    updateChannel: 'dev',
   });
 });

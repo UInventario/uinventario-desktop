@@ -48,9 +48,13 @@ export async function loadRuntimeConfig(appPath, environment) {
   const environments = JSON.parse(raw);
   const configured = environments[environment];
 
-  if (!configured || typeof configured.webUrl !== 'string') {
+  if (!configured || typeof configured.webUrl !== 'string' || !['dev', 'latest'].includes(configured.updateChannel)) {
     throw new Error(`No existe configuración Desktop para ${environment}.`);
   }
 
-  return Object.freeze({ environment, webUrl: validateWebUrl(configured.webUrl) });
+  return Object.freeze({
+    environment,
+    webUrl: validateWebUrl(configured.webUrl),
+    updateChannel: configured.updateChannel,
+  });
 }
