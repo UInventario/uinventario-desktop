@@ -3,7 +3,13 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { desktopPartition, loadRuntimeConfig, resolveEnvironment, validateWebUrl } from '../src/runtime-config.mjs';
+import {
+  desktopPartition,
+  loadRuntimeConfig,
+  resolveEnvironment,
+  validateWebPath,
+  validateWebUrl,
+} from '../src/runtime-config.mjs';
 
 test('uses dev locally and prod for a packaged application', () => {
   assert.equal(resolveEnvironment({ argv: [], env: {}, isPackaged: false }), 'dev');
@@ -39,20 +45,29 @@ test('accepts only a clean HTTPS origin', () => {
   }
 });
 
+test('accepts only a clean absolute application path', () => {
+  assert.equal(validateWebPath('/v2/'), '/v2/');
+  for (const unsafe of ['v2/', '/v2', '//evil/', '/v2/?token=secret', '/v2/#fragment']) {
+    assert.throws(() => validateWebPath(unsafe));
+  }
+});
+
 test('loads the selected environment from the packaged configuration', async () => {
   const root = await mkdtemp(join(tmpdir(), 'uinventario-desktop-'));
   await mkdir(join(root, 'config'));
   await writeFile(
     join(root, 'config', 'environments.json'),
     JSON.stringify({
-      dev: { webUrl: 'https://dev.example.com', updateChannel: 'dev' },
-      prod: { webUrl: 'https://prod.example.com', updateChannel: 'latest' },
+      dev: { webUrl: 'https://dev.example.com', webPath: '/v2/', updateChannel: 'dev' },
+      prod: { webUrl: 'https://prod.example.com', webPath: '/v2/', updateChannel: 'latest' },
     }),
   );
 
   assert.deepEqual(await loadRuntimeConfig(root, 'dev'), {
     environment: 'dev',
     webUrl: 'https://dev.example.com',
+    webPath: '/v2/',
+    appUrl: 'https://dev.example.com/v2/',
     updateChannel: 'dev',
   });
 });
