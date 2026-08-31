@@ -43,18 +43,34 @@ export function validateWebUrl(value) {
   return parsed.origin;
 }
 
+export function validateWebPath(value) {
+  if (typeof value !== 'string' || !/^\/[A-Za-z0-9._~/-]*\/$/.test(value) || value.includes('//')) {
+    throw new Error('La ruta Web Desktop debe ser absoluta, segura y terminar en /.');
+  }
+  return value;
+}
+
 export async function loadRuntimeConfig(appPath, environment) {
   const raw = await readFile(join(appPath, 'config', 'environments.json'), 'utf8');
   const environments = JSON.parse(raw);
   const configured = environments[environment];
 
-  if (!configured || typeof configured.webUrl !== 'string' || !['dev', 'latest'].includes(configured.updateChannel)) {
+  if (
+    !configured ||
+    typeof configured.webUrl !== 'string' ||
+    typeof configured.webPath !== 'string' ||
+    !['dev', 'latest'].includes(configured.updateChannel)
+  ) {
     throw new Error(`No existe configuración Desktop para ${environment}.`);
   }
 
+  const webUrl = validateWebUrl(configured.webUrl);
+  const webPath = validateWebPath(configured.webPath);
   return Object.freeze({
     environment,
-    webUrl: validateWebUrl(configured.webUrl),
+    webUrl,
+    webPath,
+    appUrl: `${webUrl}${webPath}`,
     updateChannel: configured.updateChannel,
   });
 }

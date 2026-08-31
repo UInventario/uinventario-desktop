@@ -1,10 +1,12 @@
 {
   "dev": {
     "webUrl": "https://uinventario-web-6w7v33traa-uc.a.run.app",
+    "webPath": "/v2/",
     "updateChannel": "dev"
   },
   "prod": {
     "webUrl": "https://uinventario-web-cfvk7uvacq-uc.a.run.app",
+    "webPath": "/v2/",
     "updateChannel": "latest"
   }
 }

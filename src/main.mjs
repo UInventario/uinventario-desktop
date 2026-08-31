@@ -47,7 +47,7 @@ async function waitForRenderedShell(webContents) {
 
   while (Date.now() < deadline) {
     const rendered = await webContents.executeJavaScript(
-      "Boolean(document.querySelector('app-root')?.textContent?.trim())",
+      "Boolean(document.querySelector('ui-root')?.textContent?.trim())",
       true,
     );
     if (rendered) return true;
@@ -333,7 +333,7 @@ async function createMainWindow() {
         offlineSmokePhase = 'OFFLINE';
         await emulateRendererOffline(mainWindow.webContents, true);
         await mainWindow.webContents.session.closeAllConnections();
-        await mainWindow.loadURL(`${config.webUrl}/app`);
+        await mainWindow.loadURL(config.appUrl);
         return;
       }
 
@@ -344,7 +344,7 @@ async function createMainWindow() {
         }
         offlineSmokePhase = 'RECONNECT';
         await emulateRendererOffline(mainWindow.webContents, false);
-        await mainWindow.loadURL(config.webUrl);
+        await mainWindow.loadURL(config.appUrl);
         return;
       }
 
@@ -366,7 +366,7 @@ async function createMainWindow() {
       if (mainWindow.webContents.debugger.isAttached()) {
         mainWindow.webContents.debugger.detach();
       }
-      console.log(`Desktop smoke OK: ${environment} ${config.webUrl}`);
+      console.log(`Desktop smoke OK: ${environment} ${config.appUrl}`);
       app.quit();
     } catch (error) {
       clearTimeout(smokeTimeout);
@@ -391,7 +391,7 @@ async function createMainWindow() {
   });
 
   try {
-    await mainWindow.loadURL(config.webUrl);
+    await mainWindow.loadURL(config.appUrl);
   } catch (error) {
     if (smokeTest) {
       clearTimeout(smokeTimeout);

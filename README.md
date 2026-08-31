@@ -4,6 +4,9 @@ Cliente Windows de UInventario. Electron contiene una ventana segura que reutili
 la aplicación Angular desplegada; no existe una segunda implementación de la UI ni
 de las reglas de negocio.
 
+El shell abre directamente Web V2 bajo `/v2/`; el origen continúa separado de la
+ruta para conservar la política estricta de navegación y el aislamiento por ambiente.
+
 ## Ambientes
 
 Los únicos orígenes aceptados se mantienen en `config/environments.json`:
